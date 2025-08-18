@@ -1,0 +1,6 @@
+flask
+requests
+reportlab
+Pillow
+PyPDF2
+gunicorn

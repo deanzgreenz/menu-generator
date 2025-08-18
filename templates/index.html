@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu PDF Generator</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 2rem 3rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+        h1 {
+            color: #1a1a1a;
+            margin-bottom: 0.5rem;
+        }
+        p {
+            color: #666;
+            margin-bottom: 2rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #555;
+        }
+        select, button {
+            width: 100%;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            background-color: #fdfdfd;
+            font-size: 1rem;
+            box-sizing: border-box; /* Important for padding */
+        }
+        select:focus, button:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2);
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            margin-top: 1rem;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Menu Generator</h1>
+        <p>Select a store and menu type to generate a PDF.</p>
+        
+        <!-- This form sends the user's choices to our Flask app at the '/generate' URL -->
+        <form action="/generate" method="post">
+            <div class="form-group">
+                <label for="store-select">Store Location:</label>
+                <select name="store" id="store-select">
+                    <option value="foster">Foster</option>
+                    <option value="sandy">Sandy</option>
+                    <option value="division">Division</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="menu-select">Menu Type:</label>
+                <select name="menu_type" id="menu-select">
+                    <option value="flower">Flower Menu</option>
+                    <option value="preroll">Preroll Menu</option>
+                    <option value="preroll_condensed">Preroll Menu (Condensed)</option>
+                    <option value="cart">Cart Menu</option>
+                    <option value="cart_condensed">Cart Menu (Condensed)</option>
+                    <option value="dab">Dab Menu</option>
+                    <option value="dab_condensed">Dab Menu (Condensed)</option>
+                    <option value="prepack">Prepack Menu</option>
+                    <option value="prepack_condensed">Prepack Menu (Condensed)</option>
+                </select>
+            </div>
+            
+            <button type="submit">Generate PDF</button>
+        </form>
+    </div>
+</body>
+</html>
