@@ -162,6 +162,15 @@ def truncate_text(text, max_width, font_name, font_size):
 # PREROLL SPECIFIC LOGIC
 # ------------------------------------------------------------------
 
+def group_by_brand_unit(items):
+    """Group items by (brand, unit)."""
+    grouped = {}
+    for it in items:
+        brand = (it.get("brand") or "").strip()
+        unit, _ = get_price_info(it)
+        grouped.setdefault((brand, unit), []).append(it)
+    return grouped
+
 def process_flavored_title(title: str):
     """For 'Flavored' items, remove any leading brand/price by splitting on the first hyphen."""
     if not title: return ""
