@@ -310,9 +310,12 @@ def is_thc_mg_item(item):
 
 def is_flavored_item(item):
     """
-    Checks if an item is flavored. This is often the same logic as is_thc_mg_item
-    but is kept separate for clarity.
+    Checks if an item is flavored, with a special exception for 'Verdant Leaf'.
     """
+    brand = (item.get("brand") or "").lower()
+    if "verdant leaf" in brand:
+        return False # This brand is an exception and is never flavored.
+
     product_type = (item.get("product_type") or "").lower()
     name = (item.get("name") or "").lower()
     return "flavored" in product_type or "combined" in product_type or "flavored" in name
