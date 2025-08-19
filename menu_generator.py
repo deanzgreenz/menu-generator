@@ -23,8 +23,6 @@ from reportlab.lib.colors import HexColor
 # Configuration for Different Stores/Menus
 # ------------------------------------------------------------------
 
-# We will store API keys and other settings here.
-# This makes it easy to add new stores in the future.
 STORE_CONFIG = {
     "foster": {
         "api_token": "sGPrAXqxjrIzamFGrjAxyg",
@@ -310,6 +308,12 @@ def is_thc_mg_item(item):
     title = (item.get("name") or "").lower()
     return any(term in product_type or term in title for term in ["flavored", "combined", "concentrate"])
 
+def is_disposable_item(item):
+    """Check if an item is a disposable based on keywords in its name."""
+    name = (item.get("name") or "").lower()
+    keywords = ["dispos", "all in one", "all-in-one", "allinone"]
+    return any(keyword in name for keyword in keywords)
+
 def group_by_brand_unit_price(items):
     """Group items by (brand, unit, price)."""
     groups = {}
@@ -360,7 +364,10 @@ def generate_cart_dab_pdf(items, menu_title, font_size=12):
     return pdf_data
 
 def generate_cart_dab_pdf_condensed(items, menu_title):
-    """Generic condensed PDF generator for Cart and Dab menus."""
+    """
+    Generic condensed PDF generator for Cart and Dab menus.
+    Separates disposables for cart menus.
+    """
     BASE_FONT, PAD_LR, PAD_TB, SPACER_S, SPACER_M, MARGINS = 9, 1, 0.5, 2, 4, 18
     buffer = BytesIO()
     doc = BaseDocTemplate(buffer, pagesize=letter, leftMargin=MARGINS, rightMargin=MARGINS, topMargin=24, bottomMargin=24)
@@ -368,27 +375,56 @@ def generate_cart_dab_pdf_condensed(items, menu_title):
     fw, fh = (doc.width - gap) / 2, doc.height
     frames = [Frame(doc.leftMargin, doc.bottomMargin, fw, fh), Frame(doc.leftMargin + fw + gap, doc.bottomMargin, fw, fh)]
     doc.addPageTemplates([PageTemplate(id="TwoCol", frames=frames)])
-    groups = sort_cart_dab_groups(items)
+    
+    all_groups = sort_cart_dab_groups(items)
+    
+    # Separate disposables ONLY if it's a cart menu
+    normal_groups = []
+    disposable_groups = []
+    if "CART" in menu_title.upper():
+        for brand, unit, price, subitems in all_groups:
+            # A group is disposable if ANY item in it is a disposable
+            if any(is_disposable_item(it) for it in subitems):
+                disposable_groups.append((brand, unit, price, subitems))
+            else:
+                normal_groups.append((brand, unit, price, subitems))
+    else:
+        normal_groups = all_groups # For dab menus, treat all as normal
+
     styles = getSampleStyleSheet()
     head = ParagraphStyle("Head", parent=styles["Heading1"], alignment=1, fontSize=BASE_FONT+4, leading=BASE_FONT+5)
     sub = ParagraphStyle("Sub", parent=styles["Heading2"], alignment=0, fontSize=BASE_FONT+2, leading=BASE_FONT+3)
     body = ParagraphStyle("Body", parent=styles["Normal"], fontSize=BASE_FONT, leading=BASE_FONT+1)
     elements = [Paragraph(menu_title, head), Spacer(1, SPACER_M)]
-    for brand, unit, price, subitems in groups:
-        hdr_txt = f"{brand} {unit} ${price:.2f}"
-        flow = [Paragraph(hdr_txt, sub), Spacer(1, SPACER_S)]
-        hdr = ["Product Name", "THC MG", "CBD MG"] if any(is_thc_mg_item(it) for it in subitems) else ["Product Name", "THC %", "CBD %"]
-        col_w = [fw * 0.5, fw * 0.25, fw * 0.25]
-        data = [hdr]
-        for it in subitems:
-            name = truncate_text(process_cart_dab_title(it.get("name") or ""), col_w[0], "Helvetica", BASE_FONT)
-            prod = Paragraph(name, ParagraphStyle("P", parent=body, textColor=determine_lineage_color(it)))
-            thc, cbd = it.get("thc", {}).get("current", ""), format_cbd_value(it.get("cbd", {}).get("current", ""))
-            data.append([prod, thc, cbd])
-        tbl = Table(data, colWidths=col_w)
-        tbl.setStyle(TableStyle([('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,0), BASE_FONT), ('BACKGROUND', (0,0), (-1,0), colors.grey), ('ALIGN', (1,0), (-1,-1), 'CENTER'), ('GRID', (0,0), (-1,-1), 0.25, colors.black), ('FONTNAME', (0,1), (-1,-1), 'Helvetica'), ('FONTSIZE', (0,1), (-1,-1), BASE_FONT), ('LEFTPADDING', (0,0), (-1,-1), PAD_LR), ('RIGHTPADDING', (0,0), (-1,-1), PAD_LR), ('TOPPADDING', (0,0), (-1,-1), PAD_TB), ('BOTTOMPADDING', (0,0), (-1,-1), PAD_TB)]))
-        flow.extend([tbl, Spacer(1, SPACER_M)])
-        elements.append(KeepTogether(flow))
+    
+    # Helper function to render a list of groups
+    def render_groups(groups_to_render):
+        for brand, unit, price, subitems in groups_to_render:
+            hdr_txt = f"{brand} {unit} ${price:.2f}"
+            flow = [Paragraph(hdr_txt, sub), Spacer(1, SPACER_S)]
+            hdr = ["Product Name", "THC MG", "CBD MG"] if any(is_thc_mg_item(it) for it in subitems) else ["Product Name", "THC %", "CBD %"]
+            col_w = [fw * 0.5, fw * 0.25, fw * 0.25]
+            data = [hdr]
+            for it in subitems:
+                name = truncate_text(process_cart_dab_title(it.get("name") or ""), col_w[0], "Helvetica", BASE_FONT)
+                prod = Paragraph(name, ParagraphStyle("P", parent=body, textColor=determine_lineage_color(it)))
+                thc, cbd = it.get("thc", {}).get("current", ""), format_cbd_value(it.get("cbd", {}).get("current", ""))
+                data.append([prod, thc, cbd])
+            tbl = Table(data, colWidths=col_w)
+            tbl.setStyle(TableStyle([('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,0), BASE_FONT), ('BACKGROUND', (0,0), (-1,0), colors.grey), ('ALIGN', (1,0), (-1,-1), 'CENTER'), ('GRID', (0,0), (-1,-1), 0.25, colors.black), ('FONTNAME', (0,1), (-1,-1), 'Helvetica'), ('FONTSIZE', (0,1), (-1,-1), BASE_FONT), ('LEFTPADDING', (0,0), (-1,-1), PAD_LR), ('RIGHTPADDING', (0,0), (-1,-1), PAD_LR), ('TOPPADDING', (0,0), (-1,-1), PAD_TB), ('BOTTOMPADDING', (0,0), (-1,-1), PAD_TB)]))
+            flow.extend([tbl, Spacer(1, SPACER_M)])
+            elements.append(KeepTogether(flow))
+
+    # Render the normal groups first
+    render_groups(normal_groups)
+
+    # If there are disposables, add a page break, a header, and render them
+    if disposable_groups:
+        elements.append(PageBreak())
+        elements.append(Paragraph("DISPOSABLES", head))
+        elements.append(Spacer(1, SPACER_M))
+        render_groups(disposable_groups)
+
     doc.build(elements)
     pdf_data = buffer.getvalue()
     buffer.close()
