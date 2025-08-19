@@ -308,6 +308,15 @@ def is_thc_mg_item(item):
     title = (item.get("name") or "").lower()
     return any(term in product_type or term in title for term in ["flavored", "combined", "concentrate"])
 
+def is_flavored_item(item):
+    """
+    Checks if an item is flavored. This is often the same logic as is_thc_mg_item
+    but is kept separate for clarity.
+    """
+    product_type = (item.get("product_type") or "").lower()
+    name = (item.get("name") or "").lower()
+    return "flavored" in product_type or "combined" in product_type or "flavored" in name
+
 def is_disposable_item(item):
     """Check if an item is a disposable based on keywords in its name."""
     name = (item.get("name") or "").lower()
@@ -376,38 +385,36 @@ def generate_cart_dab_pdf_condensed(items, menu_title):
     frames = [Frame(doc.leftMargin, doc.bottomMargin, fw, fh), Frame(doc.leftMargin + fw + gap, doc.bottomMargin, fw, fh)]
     doc.addPageTemplates([PageTemplate(id="TwoCol", frames=frames)])
     
-    all_groups = sort_cart_dab_groups(items)
-    
-    # Separate disposables ONLY if it's a cart menu
-    normal_groups = []
-    disposable_groups = []
-    if "CART" in menu_title.upper():
-        for brand, unit, price, subitems in all_groups:
-            # A group is disposable if ANY item in it is a disposable
-            if any(is_disposable_item(it) for it in subitems):
-                disposable_groups.append((brand, unit, price, subitems))
-            else:
-                normal_groups.append((brand, unit, price, subitems))
-    else:
-        normal_groups = all_groups # For dab menus, treat all as normal
-
     styles = getSampleStyleSheet()
-    head = ParagraphStyle("Head", parent=styles["Heading1"], alignment=1, fontSize=BASE_FONT+4, leading=BASE_FONT+5)
-    sub = ParagraphStyle("Sub", parent=styles["Heading2"], alignment=0, fontSize=BASE_FONT+2, leading=BASE_FONT+3)
-    body = ParagraphStyle("Body", parent=styles["Normal"], fontSize=BASE_FONT, leading=BASE_FONT+1)
-    elements = [Paragraph(menu_title, head), Spacer(1, SPACER_M)]
+    head_style = ParagraphStyle("Head", parent=styles["Heading1"], alignment=1, fontSize=BASE_FONT+4, leading=BASE_FONT+5)
+    section_style = ParagraphStyle("Sub", parent=styles["Heading2"], alignment=0, fontSize=BASE_FONT+2, leading=BASE_FONT+3)
+    body_style = ParagraphStyle("Body", parent=styles["Normal"], fontSize=BASE_FONT, leading=BASE_FONT+1)
     
-    # Helper function to render a list of groups
-    def render_groups(groups_to_render):
+    elements = []
+
+    # Helper function to render a list of groups under a specific heading
+    def render_section(title, items_list, page_break=False, is_main_header=False):
+        if not items_list:
+            return
+        
+        if page_break and elements:
+            elements.append(PageBreak())
+        
+        header_style = head_style if is_main_header else section_style
+        elements.append(Paragraph(title, header_style))
+        elements.append(Spacer(1, SPACER_M))
+
+        groups_to_render = sort_cart_dab_groups(items_list)
+
         for brand, unit, price, subitems in groups_to_render:
             hdr_txt = f"{brand} {unit} ${price:.2f}"
-            flow = [Paragraph(hdr_txt, sub), Spacer(1, SPACER_S)]
+            flow = [Paragraph(hdr_txt, section_style), Spacer(1, SPACER_S)]
             hdr = ["Product Name", "THC MG", "CBD MG"] if any(is_thc_mg_item(it) for it in subitems) else ["Product Name", "THC %", "CBD %"]
             col_w = [fw * 0.5, fw * 0.25, fw * 0.25]
             data = [hdr]
             for it in subitems:
                 name = truncate_text(process_cart_dab_title(it.get("name") or ""), col_w[0], "Helvetica", BASE_FONT)
-                prod = Paragraph(name, ParagraphStyle("P", parent=body, textColor=determine_lineage_color(it)))
+                prod = Paragraph(name, ParagraphStyle("P", parent=body_style, textColor=determine_lineage_color(it)))
                 thc, cbd = it.get("thc", {}).get("current", ""), format_cbd_value(it.get("cbd", {}).get("current", ""))
                 data.append([prod, thc, cbd])
             tbl = Table(data, colWidths=col_w)
@@ -415,15 +422,30 @@ def generate_cart_dab_pdf_condensed(items, menu_title):
             flow.extend([tbl, Spacer(1, SPACER_M)])
             elements.append(KeepTogether(flow))
 
-    # Render the normal groups first
-    render_groups(normal_groups)
-
-    # If there are disposables, add a page break, a header, and render them
-    if disposable_groups:
-        elements.append(PageBreak())
-        elements.append(Paragraph("DISPOSABLES", head))
-        elements.append(Spacer(1, SPACER_M))
-        render_groups(disposable_groups)
+    # --- Main Logic for PDF Generation ---
+    if "CART" in menu_title.upper():
+        # Categorize items into four groups
+        carts, flavored_carts, disposables, flavored_disposables = [], [], [], []
+        for item in items:
+            is_disp = is_disposable_item(item)
+            is_flav = is_flavored_item(item)
+            if is_disp and is_flav:
+                flavored_disposables.append(item)
+            elif is_disp:
+                disposables.append(item)
+            elif is_flav:
+                flavored_carts.append(item)
+            else:
+                carts.append(item)
+        
+        # Render sections in order
+        render_section("CARTS", carts, is_main_header=True)
+        render_section("FLAVORED CARTS", flavored_carts)
+        render_section("DISPOSABLES", disposables, page_break=True, is_main_header=True)
+        render_section("FLAVORED DISPOSABLES", flavored_disposables)
+    else:
+        # For Dab menus, use the original simpler logic
+        render_section(menu_title, items, is_main_header=True)
 
     doc.build(elements)
     pdf_data = buffer.getvalue()
