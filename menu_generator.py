@@ -252,7 +252,7 @@ def generate_preroll_pdf(grouped_data, font_size=12):
             heading = f"{brand} {unit} ${min_price:.2f}" + (f" {pack_sz} pack" if pack_sz else "")
             
             # Dynamic header based on category
-            is_infused_cat = "infused" in cat.lower() or cat == "Flavored" or cat == "Infused Preroll Packs"
+            is_infused_cat = "infused" in cat.lower() or cat == "Flavored"
             hdr = ["Product Name", "THC MG", "CBD MG"] if is_infused_cat else ["Product Name", "THC %", "CBD %"]
             
             col_w = [fw * 0.5, fw * 0.25, fw * 0.25]
@@ -303,7 +303,7 @@ def generate_preroll_pdf_condensed(grouped_data):
             head = f"{brand} {unit} ${min_price:.2f}" + (f" {pack_sz} pack" if pack_sz else "")
             flow = [Paragraph(head, sub_h), Spacer(1, SPACER_S)]
             
-            is_infused_cat = "infused" in cat.lower() or cat == "Flavored" or cat == "Infused Preroll Packs"
+            is_infused_cat = "infused" in cat.lower() or cat == "Flavored"
             hdr = ["Product Name", "THC MG", "CBD MG"] if is_infused_cat else ["Product Name", "THC %", "CBD %"]
             
             col_w = [fw*0.5, fw*0.25, fw*0.25]
