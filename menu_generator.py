@@ -187,11 +187,17 @@ def determine_preroll_category(item):
     title = (item.get("name") or item.get("strain") or "").lower()
     product_type = (item.get("product_type") or "").lower()
     brand = (item.get("brand") or "").lower()
+    
+    # Specific brand exceptions first
+    if brand == "sticks":
+        return "Infused Prerolls"
+
     weight = 0
     prices = item.get("prices", [])
     if prices:
         m = re.search(r"([\d.]+)", prices[0].get("unit", "").lower())
         if m: weight = float(m.group(1))
+
     if "flavored" in product_type or "combined" in product_type: return "Flavored"
     if "hellavated" in brand:
         if "flavored" in title or "combined" in product_type: return "Flavored"
@@ -205,10 +211,19 @@ def determine_preroll_category(item):
 
 def group_preroll_items(menu_feed):
     """Collect preroll items into category-labeled lists."""
-    cats = {"Plain Prerolls": [], "Plain Blunts": [], "Infused Prerolls": [], "Infused Blunts": [], "Flavored": [], "Preroll Packs": []}
+    cats = {
+        "Plain Prerolls": [], "Plain Blunts": [], "Infused Prerolls": [], 
+        "Infused Blunts": [], "Flavored": [], "Preroll Packs": [],
+        "Infused Preroll Packs": [] # New category
+    }
     for item in extract_all_items(menu_feed):
         cat = determine_preroll_category(item)
-        cats[cat].append(item)
+        brand = (item.get("brand") or "").lower()
+        # Re-route specific brands from Preroll Packs to Infused Preroll Packs
+        if cat == "Preroll Packs" and brand in ["entourage cannabis", "hellavated"]:
+            cats["Infused Preroll Packs"].append(item)
+        else:
+            cats[cat].append(item)
     return cats
 
 def generate_preroll_pdf(grouped_data, font_size=12):
@@ -224,7 +239,7 @@ def generate_preroll_pdf(grouped_data, font_size=12):
     sub_header_style = ParagraphStyle("SubHeader", parent=styles["Heading2"], alignment=0, fontSize=font_size + 2)
     normal_style = ParagraphStyle("Normal", parent=styles["Normal"], fontSize=font_size)
     elements = []
-    order = ["Plain Prerolls","Plain Blunts","Infused Prerolls","Infused Blunts","Flavored","Preroll Packs"]
+    order = ["Plain Prerolls","Plain Blunts","Infused Prerolls","Infused Blunts","Flavored","Preroll Packs", "Infused Preroll Packs"]
     for cat in [c for c in order if grouped_data.get(c)]:
         flow = [Paragraph(cat, cat_header_style), Spacer(1, 12)]
         gmap = {k: sorted(v, key=lambda i: (get_price_info(i)[1], get_lineage_order(get_lineage_abbr(i)), (i.get("strain") or "").lower())) for k, v in group_by_brand_unit(grouped_data[cat]).items()}
@@ -235,7 +250,11 @@ def generate_preroll_pdf(grouped_data, font_size=12):
             min_price = get_price_info(subitems[0])[1]
             pack_sz = extract_pack_size(subitems[0].get("name") or "")
             heading = f"{brand} {unit} ${min_price:.2f}" + (f" {pack_sz} pack" if pack_sz else "")
-            hdr = ["Product Name", "THC MG", "CBD MG"] if "infused" in cat.lower() or cat == "Flavored" else ["Product Name", "THC %", "CBD %"]
+            
+            # Dynamic header based on category
+            is_infused_cat = "infused" in cat.lower() or cat == "Flavored" or cat == "Infused Preroll Packs"
+            hdr = ["Product Name", "THC MG", "CBD MG"] if is_infused_cat else ["Product Name", "THC %", "CBD %"]
+            
             col_w = [fw * 0.5, fw * 0.25, fw * 0.25]
             data = [hdr]
             for it in subitems:
@@ -270,7 +289,7 @@ def generate_preroll_pdf_condensed(grouped_data):
     sub_h = ParagraphStyle("SubH", parent=styles["Heading4"], alignment=0, fontSize=BASE_FONT+1, leading=BASE_FONT+2)
     normal = ParagraphStyle("Norm", parent=styles["Normal"], fontSize=BASE_FONT, leading=BASE_FONT+1)
     elements = []
-    order = ["Plain Prerolls", "Plain Blunts", "Infused Prerolls", "Infused Blunts", "Flavored", "Preroll Packs"]
+    order = ["Plain Prerolls", "Plain Blunts", "Infused Prerolls", "Infused Blunts", "Flavored", "Preroll Packs", "Infused Preroll Packs"]
     for cat in [c for c in order if grouped_data.get(c)]:
         if cat in ("Infused Prerolls", "Preroll Packs") and elements: elements.append(PageBreak())
         elements.extend([Paragraph(cat, cat_h), Spacer(1, SPACER_S)])
@@ -283,7 +302,10 @@ def generate_preroll_pdf_condensed(grouped_data):
             pack_sz = extract_pack_size(subitems[0].get("name") or "")
             head = f"{brand} {unit} ${min_price:.2f}" + (f" {pack_sz} pack" if pack_sz else "")
             flow = [Paragraph(head, sub_h), Spacer(1, SPACER_S)]
-            hdr = ["Product Name", "THC MG", "CBD MG"] if "infused" in cat.lower() or cat == "Flavored" else ["Product Name", "THC %", "CBD %"]
+            
+            is_infused_cat = "infused" in cat.lower() or cat == "Flavored" or cat == "Infused Preroll Packs"
+            hdr = ["Product Name", "THC MG", "CBD MG"] if is_infused_cat else ["Product Name", "THC %", "CBD %"]
+            
             col_w = [fw*0.5, fw*0.25, fw*0.25]
             data = [hdr]
             for it in subitems:
