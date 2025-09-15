@@ -24,24 +24,10 @@
             max-width: 500px;
             text-align: center;
         }
-        h1 {
-            color: #1a1a1a;
-            margin-bottom: 0.5rem;
-        }
-        p {
-            color: #666;
-            margin-bottom: 2rem;
-        }
-        .form-group {
-            margin-bottom: 1.5rem;
-            text-align: left;
-        }
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: #555;
-        }
+        h1 { color: #1a1a1a; margin-bottom: 0.5rem; }
+        p { color: #666; margin-bottom: 2rem; }
+        .form-group { margin-bottom: 1.5rem; text-align: left; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #555; }
         select, button {
             width: 100%;
             padding: 12px 15px;
@@ -49,7 +35,7 @@
             border: 1px solid #ccc;
             background-color: #fdfdfd;
             font-size: 1rem;
-            box-sizing: border-box; /* Important for padding */
+            box-sizing: border-box;
         }
         select:focus, button:focus {
             outline: none;
@@ -65,17 +51,14 @@
             transition: background-color 0.2s ease-in-out;
             margin-top: 1rem;
         }
-        button:hover {
-            background-color: #0056b3;
-        }
+        button:hover { background-color: #0056b3; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Menu Generator</h1>
         <p>Select a store and menu type to generate a PDF.</p>
-        
-        <!-- This form sends the user's choices to our Flask app at the '/generate' URL -->
+
         <form action="/generate" method="post">
             <div class="form-group">
                 <label for="store-select">Store Location:</label>
@@ -100,7 +83,7 @@
                     <option value="prepack_condensed">Prepack Menu (Condensed)</option>
                 </select>
             </div>
-            
+
             <button type="submit">Generate PDF</button>
         </form>
     </div>
