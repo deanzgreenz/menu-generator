@@ -87,5 +87,45 @@
             <button type="submit">Generate PDF</button>
         </form>
     </div>
+<script>
+(function () {
+  // One client ID per browser tab (survives reloads in the same tab)
+  const KEY = "dg_menu_client_id";
+  let cid = sessionStorage.getItem(KEY);
+  if (!cid) {
+    // UUID without braces
+    cid = (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : (Date.now() + "-" + Math.random().toString(16).slice(2));
+    sessionStorage.setItem(KEY, cid);
+  }
+
+  // Helper to POST small text payloads
+  function post(url) {
+    return fetch(url, {
+      method: "POST",
+      body: cid,
+      keepalive: true   // allows pending request to finish during unload
+    }).catch(() => {});
+  }
+
+  // Tell the server we exist, then heartbeat every 30s
+  post("/client-init");
+  const timer = setInterval(() => post("/client-ping"), 30000);
+
+  // On tab close/navigation, say goodbye
+  window.addEventListener("beforeunload", function () {
+    clearInterval(timer);
+    // sendBeacon is the most reliable during unload
+    if (navigator.sendBeacon) {
+      const blob = new Blob([cid], { type: "text/plain" });
+      navigator.sendBeacon("/client-bye", blob);
+    } else {
+      post("/client-bye");
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
