@@ -286,7 +286,7 @@ def generate_preroll_pdf_condensed(grouped_data, store=None):
             is_infused_cat = "infused" in cat.lower() or cat == "Flavored"
             hdr = ["Product Name", "THC MG", "CBD MG"] if is_infused_cat else ["Product Name", "THC %", "CBD %"]
 
-            col_w = [fw*0.5, fw*0.25, fw*0.25]
+            col_w = [fw * 0.5, fw * 0.25, fw * 0.25]
             data = [hdr]
             for it in subitems:
                 name = process_flavored_title(it.get("name") or "") if cat == "Flavored" else (it.get("strain") or "")
@@ -570,7 +570,7 @@ def generate_prepack_pdf(items, font_size=9, store=None):
             ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
             ('FONTSIZE', (0,1), (-1,-1), font_size),
         ])
-        # highlight: Strain Name column index 3
+        # lineage color + highlight: Strain Name column index 3
         for i, row_item in enumerate(data_items, start=1):
             style.add("TEXTCOLOR", (0, i), (0, i), determine_lineage_color(row_item))
             style.add("FONTNAME", (3, i), (3, i), "Helvetica-Bold")
@@ -645,7 +645,7 @@ def generate_prepack_pdf_condensed(items, store=None):
             ('BOTTOMPADDING', (0,0), (-1,-1), PAD_TB),
             ('GRID', (0,0), (-1,-1), 0.25, colors.black),
         ])
-        # highlight: Strain column index 3
+        # lineage color + highlight: Strain column index 3
         for idx, row_it in enumerate(data_items, start=1):
             style.add("TEXTCOLOR", (0, idx), (0, idx), determine_lineage_color(row_it))
             style.add("FONTNAME", (3, idx), (3, idx), "Helvetica-Bold")
@@ -668,7 +668,7 @@ def generate_prepack_pdf_condensed(items, store=None):
     buffer.close()
     return pdf_data
 
-# ------------------------------ FLOWER (unchanged from last round, already scoped) ------------------------------
+# ------------------------------ FLOWER (with footer legend) ------------------------------
 PRICING = {
     "Diamond":{"REC":"Gram - $15, Eighth - $45, Quarter - $80, Half-Oz - $145, Ounce - $270","MED":"Gram - $12.50, Eighth - $37.50, Quarter - $66.67, Half-Oz - $120.83, Ounce - $225"},
     "Platinum":{"REC":"Gram - $14.00, Eighth - $40.00, Quarter - $72.00, Half-Oz - $135.00, Ounce - $250.00","MED":"Gram - $11.67, Eighth - $33.33, Quarter - $60.00, Half-Oz - $112.50, Ounce - $208.33"},
@@ -753,6 +753,15 @@ def generate_flower_pdf(items, store=None, font_size=12):
 
         tbl.setStyle(sty)
         flow.append(tbl)
+
+        # Footer legend ONLY for Flower
+        legend_style_y = ParagraphStyle("LegendY", parent=styles["Normal"], fontSize=8, alignment=1, backColor=colors.yellow)
+        legend_style_b = ParagraphStyle("LegendB", parent=styles["Normal"], fontSize=8, alignment=1, backColor=colors.lightblue)
+        legend = Table(
+            [[Paragraph("30% OFF", legend_style_y), Paragraph("50% OFF", legend_style_b)]],
+            colWidths=[doc.width / 2, doc.width / 2]
+        )
+        flow.extend([Spacer(1, 8), legend])
 
         all_flow.extend(flow)
         if ti < 2: all_flow.append(PageBreak())
