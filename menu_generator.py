@@ -104,6 +104,22 @@ def truncate_text(text, max_w, font, size):
         text = text[:-1]
     return text + ell
 
+def prefer_strain(item):
+    """
+    Prefer the POSaBIT 'strain' field.
+    If empty, try to parse the middle segment from 'Brand - Strain - ...' product name.
+    """
+    s = (item.get("strain") or "").strip()
+    if s:
+        return s
+    name = (item.get("name") or "").strip()
+    if not name:
+        return ""
+    parts = [p.strip() for p in name.split(" - ")]
+    if len(parts) >= 2:
+        return parts[1]  # Brand - Strain - ...
+    return name  # last resort
+
 # Store-scoped discount matcher (tolerates suffixes like "Division St")
 def has_discount_tag_for_store(item, percent: int, store: str) -> bool:
     """
@@ -220,7 +236,7 @@ def generate_preroll_pdf(grouped_data, font_size=12, store=None):
             col_w = [fw * 0.5, fw * 0.25, fw * 0.25]
             data = [hdr]
             for it in subitems:
-                name = process_flavored_title(it.get("name") or "") if cat == "Flavored" else (it.get("strain") or "")
+                name = process_flavored_title(it.get("name") or "") if cat == "Flavored" else prefer_strain(it)
                 t_name = truncate_text(name, col_w[0], "Helvetica", font_size)
                 p_par = Paragraph(t_name, ParagraphStyle("Prod", parent=normal_style, textColor=determine_lineage_color(it)))
                 thc, cbd = it.get("thc", {}).get("current", ""), format_cbd_value(it.get("cbd", {}).get("current", ""))
@@ -271,7 +287,7 @@ def generate_preroll_pdf_condensed(grouped_data, store=None):
             elements.append(PageBreak())
         elements.extend([Paragraph(cat, cat_h), Spacer(1, SPACER_S)])
         gmap = {
-            k: sorted(v, key=lambda i: (get_price_info(i)[1], get_lineage_order(get_lineage_abbr(i)), (i.get("strain") or "").lower()))
+            k: sorted(v, key=lambda i: (get_price_info(i)[1], get_lineage_order(get_lineage_abbr(i)), (prefer_strain(i) or "").lower()))
             for k, v in group_by_brand_unit(grouped_data[cat]).items()
         }
         sorted_keys = sorted(gmap.keys(), key=lambda k: (min((get_price_info(i)[1] for i in gmap[k]), default=9e9), k[0].lower(), k[1].lower()))
@@ -286,10 +302,10 @@ def generate_preroll_pdf_condensed(grouped_data, store=None):
             is_infused_cat = "infused" in cat.lower() or cat == "Flavored"
             hdr = ["Product Name", "THC MG", "CBD MG"] if is_infused_cat else ["Product Name", "THC %", "CBD %"]
 
-            col_w = [fw * 0.5, fw * 0.25, fw * 0.25]
+            col_w = [fw*0.5, fw*0.25, fw*0.25]
             data = [hdr]
             for it in subitems:
-                name = process_flavored_title(it.get("name") or "") if cat == "Flavored" else (it.get("strain") or "")
+                name = process_flavored_title(it.get("name") or "") if cat == "Flavored" else prefer_strain(it)
                 t_name = truncate_text(name, col_w[0], "Helvetica", BASE_FONT)
                 p_par = Paragraph(t_name, ParagraphStyle("P", parent=normal, textColor=determine_lineage_color(it)))
                 thc, cbd = it.get("thc", {}).get("current", ""), format_cbd_value(it.get("cbd", {}).get("current", ""))
@@ -309,7 +325,6 @@ def generate_preroll_pdf_condensed(grouped_data, store=None):
                 ('TOPPADDING', (0,0), (-1,-1), PAD_TB),
                 ('BOTTOMPADDING', (0,0), (-1,-1), PAD_TB)
             ])
-            # highlight: Product column index 0
             for i, it in enumerate(subitems, start=1):
                 if store and has_discount_tag_for_store(it, 30, store):
                     sty.add('BACKGROUND', (0, i), (0, i), colors.yellow)
@@ -361,7 +376,7 @@ def sort_cart_dab_groups(items):
     sorted_keys = sorted(group_map.keys(), key=lambda k: (k[2], k[0].lower(), k[1].lower()))
     return [
         (k[0], k[1], k[2],
-         sorted(group_map[k], key=lambda i: (get_price_info(i)[1], get_lineage_order(get_lineage_abbr(i)), (i.get("strain") or "").lower()))
+         sorted(group_map[k], key=lambda i: (get_price_info(i)[1], get_lineage_order(get_lineage_abbr(i)), (prefer_strain(i) or "").lower()))
         ) for k in sorted_keys
     ]
 
@@ -400,7 +415,6 @@ def generate_cart_dab_pdf(items, menu_title, font_size=12, store=None):
             ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
             ('FONTSIZE', (0,1), (-1,-1), font_size)
         ])
-        # highlight: Product column index 0
         for i, it in enumerate(subitems, start=1):
             if store and has_discount_tag_for_store(it, 30, store):
                 sty.add('BACKGROUND', (0, i), (0, i), colors.yellow)
@@ -468,7 +482,6 @@ def generate_cart_dab_pdf_condensed(items, menu_title, store=None):
                 ('TOPPADDING', (0,0), (-1,-1), PAD_TB),
                 ('BOTTOMPADDING', (0,0), (-1,-1), PAD_TB)
             ])
-            # highlight: Product column index 0
             for i, it in enumerate(subitems, start=1):
                 if store and has_discount_tag_for_store(it, 30, store):
                     sty.add('BACKGROUND', (0, i), (0, i), colors.yellow)
@@ -516,7 +529,7 @@ def sort_items_by_price_and_lineage(items):
     def sort_key(item):
         price = item.get("prices", [{}])[0].get("price_cents", 999999)
         lineage_val = get_lineage_order(get_lineage_abbr(item))
-        strain = (item.get("strain") or "").strip().lower()
+        strain = prefer_strain(item).lower()
         return (price, lineage_val, strain)
     return sorted(items, key=sort_key)
 
@@ -556,7 +569,7 @@ def generate_prepack_pdf(items, font_size=9, store=None):
             abbr = get_lineage_abbr(it)
             price = f"${get_price_info(it)[1]:.2f}" if get_price_info(it)[1] else ""
             grams = get_all_weights(it)
-            strain = truncate_text(it.get("strain", ""), col_widths[3], "Helvetica", font_size)
+            strain = truncate_text(prefer_strain(it), col_widths[3], "Helvetica", font_size)
             thc = f"{it.get('thc', {}).get('current', '')}%" if it.get('thc', {}).get('current') else ""
             table_data.append([abbr, price, grams, strain, thc])
         tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
@@ -570,7 +583,6 @@ def generate_prepack_pdf(items, font_size=9, store=None):
             ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
             ('FONTSIZE', (0,1), (-1,-1), font_size),
         ])
-        # lineage color + highlight: Strain Name column index 3
         for i, row_item in enumerate(data_items, start=1):
             style.add("TEXTCOLOR", (0, i), (0, i), determine_lineage_color(row_item))
             style.add("FONTNAME", (3, i), (3, i), "Helvetica-Bold")
@@ -626,8 +638,8 @@ def generate_prepack_pdf_condensed(items, store=None):
         for it in data_items:
             lin_abbr = get_lineage_abbr(it)
             price = f"${get_price_info(it)[1]:.2f}" if get_price_info(it)[1] else ""
+            strain = truncate_text(prefer_strain(it), col_w[3], "Helvetica", BASE_FONT)
             grams = get_all_weights(it)
-            strain = truncate_text(it.get("strain", ""), col_w[3], "Helvetica", BASE_FONT)
             thc = f"{it.get('thc', {}).get('current', '')}%" if it.get('thc', {}).get('current') else ""
             rows.append([lin_abbr, price, grams, strain, thc])
         tbl = Table(rows, colWidths=col_w, repeatRows=1)
@@ -645,7 +657,6 @@ def generate_prepack_pdf_condensed(items, store=None):
             ('BOTTOMPADDING', (0,0), (-1,-1), PAD_TB),
             ('GRID', (0,0), (-1,-1), 0.25, colors.black),
         ])
-        # lineage color + highlight: Strain column index 3
         for idx, row_it in enumerate(data_items, start=1):
             style.add("TEXTCOLOR", (0, idx), (0, idx), determine_lineage_color(row_it))
             style.add("FONTNAME", (3, idx), (3, idx), "Helvetica-Bold")
@@ -668,7 +679,7 @@ def generate_prepack_pdf_condensed(items, store=None):
     buffer.close()
     return pdf_data
 
-# ------------------------------ FLOWER (with footer legend) ------------------------------
+# ------------------------------ FLOWER (with footer legend; uses prefer_strain) ------------------------------
 PRICING = {
     "Diamond":{"REC":"Gram - $15, Eighth - $45, Quarter - $80, Half-Oz - $145, Ounce - $270","MED":"Gram - $12.50, Eighth - $37.50, Quarter - $66.67, Half-Oz - $120.83, Ounce - $225"},
     "Platinum":{"REC":"Gram - $14.00, Eighth - $40.00, Quarter - $72.00, Half-Oz - $135.00, Ounce - $250.00","MED":"Gram - $11.67, Eighth - $33.33, Quarter - $60.00, Half-Oz - $112.50, Ounce - $208.33"},
@@ -692,7 +703,7 @@ def sort_flower_items(items):
     def k(it):
         return (
             get_lineage_order(get_lineage_abbr(it)),
-            (it.get("name") or "").strip().lower(),
+            prefer_strain(it).lower(),                   # use clean strain for ordering
             (it.get("brand") or "").strip().lower(),
             price_cents(it),
             str(it.get("id") or it.get("uuid") or it.get("sku") or "")
@@ -721,7 +732,7 @@ def generate_flower_pdf(items, store=None, font_size=12):
         sorted_items = sort_flower_items(tier_items)
 
         for it in sorted_items:
-            strain = (it.get("name") or "").replace(" [Gold]","")
+            strain = prefer_strain(it)
             data.append([
                 get_lineage_abbr(it),
                 truncate_text(strain, colw[1]-font_size, "Helvetica", font_size),

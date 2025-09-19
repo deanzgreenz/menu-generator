@@ -5,6 +5,56 @@ import menu_generator
 
 app = Flask(__name__)
 
+# --- add near the top of app.py ---
+import time, uuid
+from flask import Flask, render_template, request, send_file
+
+app = Flask(__name__)
+
+# Track client activity so the launcher can shut down on idle
+_last_request_ts = time.time()
+_open_clients = {}  # client_id -> last_seen_epoch
+
+@app.before_request
+def _touch_last_request():
+    global _last_request_ts
+    _last_request_ts = time.time()
+
+@app.route("/client-init", methods=["POST"])
+def client_init():
+    cid = (request.get_data(as_text=True) or "").strip() or str(uuid.uuid4())
+    _open_clients[cid] = time.time()
+    return "ok", 200
+
+@app.route("/client-ping", methods=["POST"])
+def client_ping():
+    cid = (request.get_data(as_text=True) or "").strip()
+    if cid:
+        _open_clients[cid] = time.time()
+    return "ok", 200
+
+@app.route("/client-bye", methods=["POST"])
+def client_bye():
+    cid = (request.get_data(as_text=True) or "").strip()
+    if cid and cid in _open_clients:
+        _open_clients.pop(cid, None)
+    return "ok", 200
+
+def get_last_request():
+    """Used by run.py to check idle time."""
+    return _last_request_ts
+
+def get_open_client_count():
+    """Used by run.py to decide if any tabs are still around."""
+    # prune stale entries (e.g., a tab crashed and never sent 'bye')
+    now = time.time()
+    stale_cutoff = now - 180  # 3 minutes
+    stale = [cid for cid, ts in _open_clients.items() if ts < stale_cutoff]
+    for cid in stale:
+        _open_clients.pop(cid, None)
+    return len(_open_clients)
+
+
 # Map dropdown choices to extractors and generators
 MENU_GENERATOR_MAP = {
     # Flower (needs store for highlight scoping)
